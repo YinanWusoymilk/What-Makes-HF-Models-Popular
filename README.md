@@ -1,6 +1,6 @@
 this paper-->
 
-> 中文工作稿: [`README.zh.md`](README.zh.md)
+> Chinese working draft: [`README.zh.md`](README.zh.md)
 
 
 ## Table of Contents
@@ -27,6 +27,7 @@ this paper-->
   - [Rerun Preprocessing](#rerun-preprocessing)
 - [Research Questions](#research-questions)
   - [RQ1: Feature Differences Between Popular and Unpopular Models](#rq1-feature-differences-between-popular-and-unpopular-models)
+  - [RQ2: Feature Importance for Popularity Prediction](#rq2-feature-importance-for-popularity-prediction)
 
 
 ## Data Collection
@@ -510,7 +511,89 @@ The script writes:
 - `significance_summary_10-10-80.md`
 
 
-rq2:
+### RQ2: Feature Importance for Popularity Prediction
+
+RQ2 evaluates which features are most important when the 31 features are
+considered jointly in a prediction model. The analysis is run separately for the
+downloads and likes groupings under the main 10-10-80 scheme.
+
+The relevant files live under
+[`research-qs-analysis/random-forest/`](research-qs-analysis/random-forest/):
+
+- [`correlation_detection.py`](research-qs-analysis/random-forest/correlation_detection.py)
+  removes highly correlated features before model training.
+- [`mutual_information.py`](research-qs-analysis/random-forest/mutual_information.py)
+  ranks the remaining features by mutual information and selects the best `k`
+  by Random Forest cross-validation AUC.
+- [`ml_classifiers.py`](research-qs-analysis/random-forest/ml_classifiers.py)
+  compares five classifiers and computes permutation importance on the best
+  classifier.
+- [`rq2_summary_10-10-80.md`](research-qs-analysis/random-forest/rq2_summary_10-10-80.md)
+  is the generated detailed RQ2 result summary.
+
+#### Pipeline
+
+Step 1 uses Spearman correlation on the 31 paper-defined features. For any pair
+with `|rho| > 0.7`, the script removes the feature with lower absolute
+correlation to the binary popularity label. In the current outputs, this removes
+5 features and leaves 26 features for both downloads and likes. The common
+removed features are `has-dataset`, `num-dataset`, `num-model-files`, and
+`has-supported-lib`; the fifth removed feature differs by indicator:
+`has-impl-lib` for downloads and `has-additional-fw` for likes. The script output
+uses internal column names for these features.
+
+Step 2 computes mutual information on the 26 remaining features. The script then
+sweeps `k = 5..26` and trains a Random Forest with 5-fold cross-validation to
+choose the best number of features. The selected `k` is 26 for both indicators.
+
+Step 3 compares five classifiers: Random Forest, Decision Tree, Linear SVM,
+Gaussian Naive Bayes, and KNN. The script uses `GridSearchCV` with 10-fold
+cross-validation repeated 10 times, so each model is evaluated across 100 folds.
+ROC AUC is the primary metric; accuracy, precision, recall, and F1 are reported
+as secondary metrics. For classifiers that support it, the script uses
+`class_weight='balanced'` to account for the approximately 1:8
+popular-to-unpopular class imbalance. Following Fan et al., AUC > 0.7 is treated
+as a reference threshold for acceptable discrimination.
+
+Step 4 selects the classifier with the highest AUC and computes permutation
+importance on a stratified 80/20 holdout test set with 30 shuffles per feature.
+ROC AUC is the scoring metric for permutation importance.
+
+#### Current 10-10-80 Results
+
+Random Forest is the best classifier for both popularity indicators:
+
+- downloads: AUC = 0.8610 ± 0.0072, best params
+  `{'clf__max_depth': 20, 'clf__n_estimators': 200}`
+- likes: AUC = 0.8477 ± 0.0064, best params
+  `{'clf__max_depth': None, 'clf__n_estimators': 200}`
+
+The top-10 permutation-importance lists share 8 features across downloads and
+likes: `word_count_content`, `word_count_yaml`, `model_size_bytes`,
+`num_arxiv`, `num_code_blk`, `num_github_links`, `num_root_file`, and
+`has_quantized`.
+
+Detailed RQ2 results are available in the generated summary:
+[`rq2_summary_10-10-80.md`](research-qs-analysis/random-forest/rq2_summary_10-10-80.md).
+
+#### Rerun RQ2
+
+Run the scripts in order:
+
+```bash
+cd research-qs-analysis/random-forest
+python3 correlation_detection.py
+python3 mutual_information.py
+python3 ml_classifiers.py
+```
+
+The main outputs include:
+
+- `remaining_features_<downloads|likes>_10-10-80.csv`
+- `selected_features_<downloads|likes>_10-10-80.csv`
+- `ml_classifier_results_<downloads|likes>_10-10-80.csv`
+- `permutation_importance_<downloads|likes>_10-10-80.csv`
+- `rq2_summary_10-10-80.md`
 
 
 rq3:
