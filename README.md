@@ -25,6 +25,8 @@ this paper-->
   - [Step 2: Distribution Visualization](#step-2-distribution-visualization)
   - [Step 3: Manual Sanity Check](#step-3-manual-sanity-check)
   - [Rerun Preprocessing](#rerun-preprocessing)
+- [Research Questions](#research-questions)
+  - [RQ1: Feature Differences Between Popular and Unpopular Models](#rq1-feature-differences-between-popular-and-unpopular-models)
 
 
 ## Data Collection
@@ -417,11 +419,95 @@ Before rerunning, make sure `feature-extraction/full_model_features.csv` and
 already exist.
 
 
-research question:
+## Research Questions
 
+This section documents the analysis scripts for the three research questions.
 
-rq1:
+### RQ1: Feature Differences Between Popular and Unpopular Models
 
+RQ1 asks whether, under the main 10-10-80 scheme, the popular group and the
+unpopular group differ across the 31 paper-defined features. This step is a
+feature-by-feature comparison; it does not train a prediction model.
+
+The relevant files live under
+[`research-qs-analysis/significant-analyze/`](research-qs-analysis/significant-analyze/):
+
+- [`sig_analysis.py`](research-qs-analysis/significant-analyze/sig_analysis.py)
+  is the main RQ1 script.
+- `significance_analysis_by_downloads_10-10-80.csv` stores the 31 feature tests
+  under the downloads-based grouping.
+- `significance_analysis_by_likes_10-10-80.csv` stores the 31 feature tests
+  under the likes-based grouping.
+- [`significance_summary_10-10-80.md`](research-qs-analysis/significant-analyze/significance_summary_10-10-80.md)
+  is the generated human-readable summary. It contains the full 31-feature
+  result tables, popular/unpopular medians or proportions, FDR-corrected
+  p-values, effect sizes, and a compact table of features with at least small
+  effect sizes.
+
+#### Inputs
+
+The script fixes `SCHEME = '10-10-80'` and reads the two grouped CSV files
+produced by preprocessing:
+
+```python
+FILTERED_DIR = os.path.join(script_dir, '../../data-preproc-dist-analyze/filtered_data')
+
+analyses = {
+    'downloads': os.path.join(FILTERED_DIR, f'filtered_model_data_by_downloads_{SCHEME}.csv'),
+    'likes': os.path.join(FILTERED_DIR, f'filtered_model_data_by_likes_{SCHEME}.csv'),
+}
+```
+
+Each input file contains 66,909 models and the internal `category` column. RQ1
+compares only models with `category == 'popular'` and
+`category == 'unpopular'`; the `gap` rows are excluded as the gap buffer. Thus,
+each popularity indicator contributes 6,690 popular models and 53,528
+unpopular models to the tests.
+
+#### Feature List
+
+The script lists the 31 paper-defined features in `features_continuous` and
+`features_binary`, and uses `DIMENSION_OF` / `ordered_features` to keep the
+output ordered by the paper dimensions. The script uses internal column names.
+For example, `word_count_yaml` maps to the paper-facing feature name
+`length-yaml`, and `word_count_content` maps to `length-doc`. This mapping is
+the same one documented in the Feature Extraction section.
+
+#### Statistical Method
+
+RQ1 uses different tests by feature type:
+
+- Continuous features: Mann-Whitney U test for distributional differences
+  between the popular and unpopular groups; effect size is Cliff's Delta.
+- Binary features: Chi-square test for differences in 0/1 proportions between
+  the two groups; effect size is Cramér's V.
+- Multiple testing: Benjamini-Hochberg FDR correction with `alpha = 0.05` over
+  the 31 tests under each popularity indicator.
+
+The effect-size interpretation thresholds are encoded in
+`interpret_cliffs_delta()` and `interpret_cramers_v()`.
+
+In the current 10-10-80 outputs, 28 of the 31 features are FDR-significant
+under the downloads grouping, and 29 of the 31 features are FDR-significant
+under the likes grouping.
+
+Detailed RQ1 results are available in the generated summary:
+[`significance_summary_10-10-80.md`](research-qs-analysis/significant-analyze/significance_summary_10-10-80.md).
+
+#### Rerun RQ1
+
+Run:
+
+```bash
+cd research-qs-analysis/significant-analyze
+python3 sig_analysis.py
+```
+
+The script writes:
+
+- `significance_analysis_by_downloads_10-10-80.csv`
+- `significance_analysis_by_likes_10-10-80.csv`
+- `significance_summary_10-10-80.md`
 
 
 rq2:
