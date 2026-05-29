@@ -28,6 +28,7 @@ this paper-->
 - [Research Questions](#research-questions)
   - [RQ1: Feature Differences Between Popular and Unpopular Models](#rq1-feature-differences-between-popular-and-unpopular-models)
   - [RQ2: Feature Importance for Popularity Prediction](#rq2-feature-importance-for-popularity-prediction)
+  - [RQ3: Cross-Group Generalization](#rq3-cross-group-generalization)
 
 
 ## Data Collection
@@ -596,7 +597,94 @@ The main outputs include:
 - `rq2_summary_10-10-80.md`
 
 
-rq3:
+### RQ3: Cross-Group Generalization
+
+RQ3 evaluates whether the popularity prediction patterns learned from one group
+of models transfer to another group. The analysis uses the main 10-10-80 scheme
+and runs separately for downloads and likes. It studies two grouping dimensions:
+model domain and author affiliation.
+
+The relevant files live under
+[`research-qs-analysis/cross-grouping/`](research-qs-analysis/cross-grouping/):
+
+- [`get_author_affiliation.py`](research-qs-analysis/cross-grouping/get_author_affiliation.py)
+  collects author affiliation labels from Hugging Face profile pages. This step
+  depends on user-provided Hugging Face API keys and is only needed when
+  rebuilding the affiliation file.
+- [`mapping_domain_affiliation.py`](research-qs-analysis/cross-grouping/mapping_domain_affiliation.py)
+  maps `pipeline_content` to model domains and joins each model with the
+  collected author affiliation.
+- [`cross_group_rf_analysis.py`](research-qs-analysis/cross-grouping/cross_group_rf_analysis.py)
+  runs the cross-group Random Forest analysis using the RQ2 best classifier and
+  selected features.
+- [`rq3_summary_10-10-80.md`](research-qs-analysis/cross-grouping/rq3_summary_10-10-80.md)
+  is the generated detailed RQ3 result summary.
+
+#### Pipeline
+
+Step 1 builds the author affiliation file. The script parses Hugging Face author
+profile pages and stores one final affiliation record per author. The current
+analysis uses the completed `authors_info_final.json` file.
+
+Step 2 adds two grouping variables to the filtered model data. The `domain`
+column maps Hugging Face `pipeline_content` values to the study domains
+(`Audio`, `Computer Vision`, `Multimodal`, `NLP`, `Tabular`, and
+`Reinforcement Learning`), with unmapped or missing values assigned to `Other`.
+The `affiliation` column is joined from the author-affiliation file. In the
+current data, `Other` is mostly models without a `pipeline_content` value, so it
+should be interpreted as a mixed missing-tag group rather than a single model
+domain.
+
+Step 3 reuses the RQ2 Random Forest settings and selected features, then runs
+three analyses for each grouping dimension. First, it estimates a within-group
+baseline with 10-fold cross-validation inside each group. Second, it runs
+1-vs-1 cross-group evaluation by training on one group and testing on another.
+Third, it trains on all other groups together and tests on the held-out target
+group. Groups enter the analysis only when they have at least 30 popular and 30
+unpopular models.
+
+#### Current 10-10-80 Results
+
+Five domain groups enter the analysis: `Audio`, `Computer Vision`,
+`Multimodal`, `NLP`, and `Other`. Five affiliation groups enter the analysis:
+`community`, `company`, `non-profit`, `organization or individual`, and
+`university`.
+
+The within-group baselines are high across both grouping dimensions, with AUCs
+roughly between 0.77 and 0.89. Cross-group transfer is weaker but remains above
+random in most cases. Compared with the within-group baseline, average 1-vs-1
+cross-group AUC drops by about 0.12-0.15 for domain groups and about 0.16-0.17
+for affiliation groups. This suggests that the features contain both shared
+predictive information and group-specific patterns.
+
+Training on all other groups together consistently performs better than training
+on a single source group. The others-vs-1 setting improves over the average
+1-vs-1 result by about 0.031-0.050 AUC across the four analyses. This pattern
+suggests that more diverse training data helps the classifier learn popularity
+patterns that transfer better across groups.
+
+Detailed RQ3 results are available in the generated summary:
+[`rq3_summary_10-10-80.md`](research-qs-analysis/cross-grouping/rq3_summary_10-10-80.md).
+
+#### Rerun RQ3
+
+Run the scripts in order:
+
+```bash
+cd research-qs-analysis/cross-grouping
+python3 get_author_affiliation.py
+python3 mapping_domain_affiliation.py
+python3 cross_group_rf_analysis.py
+```
+
+The main outputs include:
+
+- `authors_info_final.json`
+- `mapping_outputs/data_with_domain_affiliation_<downloads|likes>_10-10-80.csv`
+- `cross_group_outputs/within_<domain|affiliation>_<downloads|likes>_10-10-80.csv`
+- `cross_group_outputs/cross_<domain|affiliation>_single_<downloads|likes>_10-10-80.csv`
+- `cross_group_outputs/cross_<domain|affiliation>_combined_<downloads|likes>_10-10-80.csv`
+- `rq3_summary_10-10-80.md`
 
 
 
