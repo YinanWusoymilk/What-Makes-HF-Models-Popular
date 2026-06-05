@@ -29,6 +29,10 @@ this paper-->
   - [RQ1: Feature Differences Between Popular and Unpopular Models](#rq1-feature-differences-between-popular-and-unpopular-models)
   - [RQ2: Feature Importance for Popularity Prediction](#rq2-feature-importance-for-popularity-prediction)
   - [RQ3: Cross-Group Generalization](#rq3-cross-group-generalization)
+- [Discussion](#discussion)
+  - [Robustness to High-Download Outliers](#robustness-to-high-download-outliers)
+  - [Robustness to Popular-Group Thresholds](#robustness-to-popular-group-thresholds)
+  - [Qualitative Review of Sampled Model Cards](#qualitative-review-of-sampled-model-cards)
 
 
 ## Data Collection
@@ -686,6 +690,93 @@ The main outputs include:
 - `cross_group_outputs/cross_<domain|affiliation>_combined_<downloads|likes>_10-10-80.csv`
 - `rq3_summary_10-10-80.md`
 
+## Discussion
 
+The paper discussion contains two robustness checks for the main quantitative
+analysis and one qualitative review of sampled model cards. The robustness
+checks test whether the RQ1, RQ2, and RQ3 results change under alternative
+analysis choices. The qualitative review connects the quantitative features to
+concrete README and metadata examples.
 
-Discussion:
+### Robustness to High-Download Outliers
+
+This check addresses the concern that Hugging Face downloads can be inflated by
+automated pipeline calls. The corresponding code and outputs are in
+[`discussion/reduce-high-bias-robust-check/`](discussion/reduce-high-bias-robust-check/).
+
+The check removes the top 1% of models by downloads from the filtered
+66,909-model dataset. This removes 670 models and leaves 66,239 models. The
+pipeline is then rerun end to end on the cleaned data: feature selection, RQ1
+significance testing, RQ2 classifier comparison and permutation importance, and
+RQ3 cross-group transfer.
+
+The results remain close to the main analysis:
+
+- RQ1 changes only at the margin, and no feature with at least small effect in
+  the main analysis falls to negligible.
+- RQ2 model ranking is unchanged, and Random Forest remains the best classifier.
+- RQ2 permutation-importance rankings remain highly stable, with top-10 overlap
+  of 10/10 for downloads and 9/10 for likes.
+- RQ3 keeps the same overall within-group and cross-group result structure.
+
+### Robustness to Popular-Group Thresholds
+
+This check tests whether the main 10-10-80 grouping scheme is driving the
+results. The corresponding code and outputs are in
+[`discussion/diff-grouping-robust-check/`](discussion/diff-grouping-robust-check/).
+
+The paper compares the main 10-10-80 scheme with three alternative schemes:
+
+| Scheme | Popular group | Gap buffer | Unpopular group | Role | Distribution plots |
+| --- | --- | --- | --- | --- | --- |
+| 5-10-85 | top 5% | next 10% | bottom 85% | stricter popular group | [downloads](data-preproc-dist-analyze/filtered_plots/filtered_distribution_downloads_5-10-85.png), [likes](data-preproc-dist-analyze/filtered_plots/filtered_distribution_likes_5-10-85.png) |
+| 10-10-80 | top 10% | next 10% | bottom 80% | main analysis | [downloads](data-preproc-dist-analyze/filtered_plots/filtered_distribution_downloads_10-10-80.png), [likes](data-preproc-dist-analyze/filtered_plots/filtered_distribution_likes_10-10-80.png) |
+| 15-10-75 | top 15% | next 10% | bottom 75% | wider popular group | [downloads](data-preproc-dist-analyze/filtered_plots/filtered_distribution_downloads_15-10-75.png), [likes](data-preproc-dist-analyze/filtered_plots/filtered_distribution_likes_15-10-75.png) |
+| 20-10-70 | top 20% | next 10% | bottom 70% | widest popular group | [downloads](data-preproc-dist-analyze/filtered_plots/filtered_distribution_downloads_20-10-70.png), [likes](data-preproc-dist-analyze/filtered_plots/filtered_distribution_likes_20-10-70.png) |
+
+For each alternative scheme, the full pipeline is rerun and compared with the
+main analysis. The main results are stable:
+
+- Random Forest remains the best classifier under every scheme.
+- Permutation-importance rankings remain close to the main analysis.
+- `length-doc` remains the top feature.
+- RQ3 retains the same overall within-group and cross-group result structure.
+
+### Qualitative Review of Sampled Model Cards
+
+This review supports the paper discussion by checking how the main
+Documentation features appear in sampled popular model cards. We sampled
+10 cards from the downloads-based popular group and 10 from the likes-based
+popular group; two cards overlapped, leaving 18 unique popular cards. The saved
+READMEs are under
+[`sample/readme_snapshots/popular/`](discussion/qualitative-review/sample/readme_snapshots/popular/),
+and the sampled model list is
+[`sample/sampled_models_unique.csv`](discussion/qualitative-review/sample/sampled_models_unique.csv).
+
+Verified counts:
+
+| Check on sampled popular model cards | Result |
+| --- | --- |
+| Sample size | 18 popular model cards |
+| `length-doc` | mean 1,129 words; median 1,038.5 words |
+| Overall popular `length-doc` for comparison | downloads: mean 823, median 451; likes: mean 833, median 483 |
+| `length-yaml` | present in 18 / 18; mean 90 words; median 11.5 words |
+| At least one code block (`num-code-block`) | 17 / 18 |
+| At least one inline-code item (`num-inline-code`) | 15 / 18; median 4.5 items |
+| At least one GitHub link (`num-gh-links`) | 16 / 18; median 2.5 links |
+| At least one Hugging Face link (`num-hf-links`) | 13 / 18; median 4 links |
+| At least one arXiv entry (`num-arxiv-links`) | 16 / 18 |
+| arXiv link in README body | 11 / 18 |
+| BibTeX block (`has-bibtex`) | 8 / 18 |
+| Structured content | lists: 14 / 18; tables: 9 / 18 |
+
+The sampled cards are longer than the overall popular-group median and often
+include usage code, GitHub links, paper links, and citation blocks. `length-yaml`
+should be read more cautiously: all sampled cards have YAML metadata, but their
+YAML blocks are not longer than the overall popular-group median.
+
+A keyword scan for intended use, limitations, bias, misuse, risks, or related
+terms finds such content in 12 of the 18 sampled popular model cards. For example,
+[`CompVis/stable-diffusion-v1-4`](discussion/qualitative-review/sample/readme_snapshots/popular/CompVis_stable-diffusion-v1-4_README.md)
+contains sections on misuse, limitations, bias, and intended use with the
+Diffusers safety checker.
