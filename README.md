@@ -1,7 +1,3 @@
-this paper-->
-
-> Chinese working draft: [`README.zh.md`](README.zh.md)
-
 
 ## Table of Contents
 
